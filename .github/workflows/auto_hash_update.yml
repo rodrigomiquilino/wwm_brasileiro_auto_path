@@ -1,0 +1,67 @@
+name: Auto Update Version Hash
+
+# Roda quando houver push na main, apenas se master.tsv mudar
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'pt-br.tsv'
+
+permissions:
+  contents: write
+
+jobs:
+  update-hash:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Atualizar version.json com HASH
+        env:
+          # AQUI ESTÁ O HASH DO COMMIT ATUAL
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          python -c "
+          import json
+          import os
+          import subprocess
+          from datetime import datetime
+
+          sha = os.environ['COMMIT_SHA']
+          
+          # Tenta pegar a mensagem do commit para o changelog
+          try:
+              msg = subprocess.check_output(['git', 'log', '-1', '--pretty=%B']).decode('utf-8').strip()
+          except:
+              msg = 'Atualização da comunidade'
+
+          dados = {
+              'version_hash': sha,
+              'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+              'changelog': msg
+          }
+
+          # Salva o arquivo
+          with open('version.json', 'w') as f:
+              json.dump(dados, f, indent=4)
+          
+          print(f'Versão atualizada para Hash: {sha}')
+          "
+
+      - name: Commit e Push
+        run: |
+          git config --global user.name 'WWM-Auto-Bot'
+          git config --global user.email 'bot@noreply.github.com'
+          git add version.json
+          git commit -m "Auto: Update version hash [skip ci]"
+          git push
