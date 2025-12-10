@@ -1,5 +1,5 @@
 {
-    "version_hash": "69faddaaf92b10c37f6f0cdf77bd94f7d6fadcc7",
-    "updated_at": "2025-12-10 04:29:20",
-    "changelog": "Merge remote-tracking branch 'origin/dev'"
+    "version_hash": "371875827c815fd37ca89d6b226a7939e0f911b1",
+    "updated_at": "2025-12-10 05:55:54",
+    "changelog": "feat: Translate and refine various Portuguese strings in pt-br.tsv from rodrigomiquilino/dev\n\nfeat: Translate and refine various Portuguese strings in pt-br.tsv."
 }
