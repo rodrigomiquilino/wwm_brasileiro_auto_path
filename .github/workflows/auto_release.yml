@@ -1,0 +1,80 @@
+name: Auto Release e Build
+
+# GATILHO: Roda quando houver push na main, MAS SÓ se o tsv mudou
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'pt-br.tsv' # Só roda se a tradução foi alterada
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar Repositório
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Necessário para ler histórico de commits
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar Dependências
+        run: pip install pandas pyzstd requests
+
+      # 1. INCREMENTAR VERSÃO AUTOMATICAMENTE
+      # Este passo lê o version.json, aumenta o número e salva.
+      - name: Incrementar Versão
+        id: versioning
+        run: |
+          python -c "
+          import json
+          try:
+              with open('version.json', 'r') as f: d = json.load(f)
+              # Lógica simples: 1.0.5 -> 1.0.6
+              major, minor, patch = map(int, d['version'].split('.'))
+              new_ver = f'{major}.{minor}.{patch+1}'
+              d['version'] = new_ver
+              # Atualiza hash (placeholder, o launcher usa hash do arquivo, mas ok ter aqui)
+              d['hash'] = 'AUTO_GENERATED' 
+              with open('version.json', 'w') as f: json.dump(d, f, indent=4)
+              print(f'NEW_TAG=v{new_ver}')
+          except:
+              print('NEW_TAG=v1.0.0')
+          " >> $GITHUB_OUTPUT
+
+      # 2. RODAR O BUILDER (GERAR HD)
+      - name: Gerar Arquivos do Jogo
+        run: python scripts/auto_builder.py
+
+      # 3. ZIPAR A PASTA HD
+      - name: Criar Zip
+        run: zip -r HD.zip HD
+
+      # 4. COMMITAR A NOVA VERSÃO (version.json)
+      # Isso é importante para o Launcher saber que mudou a versão numérica
+      - name: Atualizar version.json no Repo
+        run: |
+          git config --global user.name 'WWM-Bot'
+          git config --global user.email 'bot@wwm.br'
+          git add version.json
+          git commit -m "Auto: Bump version to ${{ steps.versioning.outputs.NEW_TAG }} [skip ci]"
+          git push
+
+      # 5. CRIAR A RELEASE NO GITHUB
+      - name: Publicar Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.versioning.outputs.NEW_TAG }}
+          name: Versão ${{ steps.versioning.outputs.NEW_TAG }}
+          body: "Atualização automática da tradução.\n\nChanges: ${{ github.event.head_commit.message }}"
+          files: HD.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
